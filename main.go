@@ -179,53 +179,53 @@ func main() {
 // applyEnvVars reads environment variables and applies them to flags if not set via command line
 func applyEnvVars() {
 	// CONSUL_API - Consul API endpoint
-	if envVal := os.Getenv("CONSUL_API"); envVal != "" && !isFlagPassed("consul-api") {
+	if envVal := os.Getenv("TCR_CONSUL_API"); envVal != "" && !isFlagPassed("consul-api") {
 		*consulAPI = envVal
-		log.Printf("Using environment variable CONSUL_API=%s", envVal)
+		log.Printf("Using environment variable TCR_CONSUL_API=%s", envVal)
 	}
 
 	// SYNC_INTERVAL - Interval between service synchronizations
-	if envVal := os.Getenv("SYNC_INTERVAL"); envVal != "" && !isFlagPassed("sync-interval") {
+	if envVal := os.Getenv("TCR_SYNC_INTERVAL"); envVal != "" && !isFlagPassed("sync-interval") {
 		if intVal, err := strconv.Atoi(envVal); err == nil {
 			*syncInterval = intVal
-			log.Printf("Using environment variable SYNC_INTERVAL=%d", intVal)
+			log.Printf("Using environment variable TCR_SYNC_INTERVAL=%d", intVal)
 		}
 	}
 
 	// INTERNAL - Use internal container ports
-	if envVal := os.Getenv("INTERNAL"); envVal != "" && !isFlagPassed("internal") {
+	if envVal := os.Getenv("TCR_INTERNAL"); envVal != "" && !isFlagPassed("internal") {
 		*internalMode = (envVal == "true" || envVal == "1" || envVal == "yes")
-		log.Printf("Using environment variable INTERNAL=%v", *internalMode)
+		log.Printf("Using environment variable TCR_INTERNAL=%v", *internalMode)
 	}
 
 	// CLEANUP - Clean up stale services
-	if envVal := os.Getenv("CLEANUP"); envVal != "" && !isFlagPassed("cleanup") {
+	if envVal := os.Getenv("TCR_CLEANUP"); envVal != "" && !isFlagPassed("cleanup") {
 		*cleanup = (envVal == "true" || envVal == "1" || envVal == "yes")
-		log.Printf("Using environment variable CLEANUP=%v", *cleanup)
+		log.Printf("Using environment variable TCR_CLEANUP=%v", *cleanup)
 	}
 
 	// NETWORKS_PRIORITY - Prioritize networks
-	if envVal := os.Getenv("NETWORKS_PRIORITY"); envVal != "" && !isFlagPassed("networks-priority") {
+	if envVal := os.Getenv("TCR_NETWORKS_PRIORITY"); envVal != "" && !isFlagPassed("networks-priority") {
 		*networksPriority = envVal
-		log.Printf("Using environment variable NETWORKS_PRIORITY=%s", envVal)
+		log.Printf("Using environment variable TCR_NETWORKS_PRIORITY=%s", envVal)
 	}
 
 	// TAGS - Default tags
-	if envVal := os.Getenv("TAGS"); envVal != "" && !isFlagPassed("tags") {
+	if envVal := os.Getenv("TCR_TAGS"); envVal != "" && !isFlagPassed("tags") {
 		*defaultTags = envVal
-		log.Printf("Using environment variable TAGS=%s", envVal)
+		log.Printf("Using environment variable TCR_TAGS=%s", envVal)
 	}
 
 	// DEREGISTER - Deregister behavior
-	if envVal := os.Getenv("DEREGISTER"); envVal != "" && !isFlagPassed("deregister") {
+	if envVal := os.Getenv("TCR_DEREGISTER"); envVal != "" && !isFlagPassed("deregister") {
 		*deregisterBehavior = envVal
-		log.Printf("Using environment variable DEREGISTER=%s", envVal)
+		log.Printf("Using environment variable TCR_DEREGISTER=%s", envVal)
 	}
 
 	// HOST_IP - Host IP
-	if envVal := os.Getenv("HOST_IP"); envVal != "" && !isFlagPassed("host-ip") {
+	if envVal := os.Getenv("TCR_HOST_IP"); envVal != "" && !isFlagPassed("host-ip") {
 		*hostIP = envVal
-		log.Printf("Using environment variable HOST_IP=%s", envVal)
+		log.Printf("Using environment variable TCR_HOST_IP=%s", envVal)
 	}
 }
 

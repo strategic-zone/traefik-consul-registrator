@@ -12,11 +12,11 @@ services:
       # Timezone setting
       TZ: Europe/Paris
       # Command line options as environment variables
-      CONSUL_API: "$CONSUL_API"
-      SYNC_INTERVAL: "30"
-      INTERNAL: "true"
-      CLEANUP: "true"
-      TAGS: "traefik,service"
+      TCR_CONSUL_API: "$TCR_CONSUL_API"
+      TCR_SYNC_INTERVAL: "30"
+      TCR_INTERNAL: "true"
+      TCR_CLEANUP: "true"
+      TCR_TAGS: "traefik,service"
       # Optional settings (commented out by default)
       # HOST_IP: "" # Auto-detected when blank
       # NETWORKS_PRIORITY: "bridge,traefik" # Prioritize networks
