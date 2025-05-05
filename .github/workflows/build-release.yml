@@ -253,6 +253,7 @@ jobs:
           # Create a temporary JSON file for the payload
           cat > /tmp/discord-payload.json << EOL
           {
+            "content": "$([[ "$STATUS" == "success" ]] && echo "🎉 Awesome! Deployment Succeeded 🚀" || echo "❌ Deployment Failed")",
             "embeds": [{
               "title": "🐳 Docker Image $([[ "$STATUS" == "success" ]] && echo "Built Successfully! 🚀" || echo "Build Failed")",
               "description": "Author: $ACTOR\nBranch: $BRANCH\nVersion: $VERSION\nMessage: $COMMIT_MSG\n\n**Docker Image:**\nghcr.io/$REPO:$VERSION\nghcr.io/$REPO:latest\n\n**Pull Command:**\n\`\`\`\ndocker pull ghcr.io/$REPO:latest\n\`\`\`\n\n**GitHub Release:**\nhttps://github.com/$REPO/releases/tag/v$VERSION",
