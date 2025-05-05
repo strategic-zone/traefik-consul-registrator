@@ -94,6 +94,10 @@ jobs:
           name: traefik-consul-registrator-${{ needs.build.outputs.version }}
           path: /tmp
 
+      - name: Set Release Date
+        id: release_date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+            
       - name: Create Release with Assets
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -104,7 +108,7 @@ jobs:
             ${{ github.event.inputs.release_notes || format('Auto-generated release from commit {0}', github.sha) }}
             
             ### Release Date
-            $(date +'%Y-%m-%d')
+            ${{ steps.release_date.outputs.date }}
             
             ### About this release
             This release contains the Traefik Consul Registrator application that automatically registers 
@@ -118,6 +122,14 @@ jobs:
             
             ### Docker Image
             Docker image is available as an artifact in this workflow run.
+            
+            [Download Docker Image](https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/traefik-consul-registrator-${{ needs.build.outputs.version }}.tar)
+            
+            **Docker Pull Command:**
+            ```bash
+            # After downloading and loading the image:
+            docker load < traefik-consul-registrator-${{ needs.build.outputs.version }}.tar
+            ```
           draft: false
           prerelease: false
           files: /tmp/traefik-consul-registrator.tar
@@ -185,17 +197,24 @@ jobs:
           STATUS="${{ steps.notification.outputs.STATUS }}"
           MESSAGE="${{ steps.notification.outputs.MESSAGE }}"
           COLOR=$([[ "$STATUS" == "success" ]] && echo "5025616" || echo "16711680")
+          VERSION="v${{ needs.build.outputs.version }}"
+          ACTOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          
+          # Create proper JSON with jq
+          TITLE="Traefik Consul Registrator Release $([[ "$STATUS" == "success" ]] && echo "Successful" || echo "Failed")"
+          DESCRIPTION="$MESSAGE\n\nRelease: $VERSION\nBy: $ACTOR"
+          URL="https://github.com/$REPO/releases/tag/$VERSION"
+          
+          JSON=$(jq -n \
+            --arg title "$TITLE" \
+            --arg desc "$DESCRIPTION" \
+            --arg url "$URL" \
+            --argjson color "$COLOR" \
+            '{"embeds": [{"title": $title, "description": $desc, "color": $color, "url": $url}]}'
+          )
           
           curl -X POST \
             -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [
-                {
-                  \"title\": \"Traefik Consul Registrator Release $([[ \"$STATUS\" == \"success\" ]] && echo \"Successful\" || echo \"Failed\")\",
-                  \"description\": \"$MESSAGE\\n\\nRelease: v${{ needs.build.outputs.version }}\\nBy: ${{ github.actor }}\",
-                  \"color\": $COLOR,
-                  \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v${{ needs.build.outputs.version }}\"
-                }
-              ]
-            }" \
+            -d "$JSON" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
