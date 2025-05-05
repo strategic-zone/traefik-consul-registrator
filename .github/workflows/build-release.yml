@@ -80,13 +80,21 @@ jobs:
     needs: build
     if: success()
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       status: ${{ job.status }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Create Release
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: traefik-consul-registrator-${{ needs.build.outputs.version }}
+          path: /tmp
+
+      - name: Create Release with Assets
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
@@ -112,20 +120,9 @@ jobs:
             Docker image is available as an artifact in this workflow run.
           draft: false
           prerelease: false
-      
-      - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: traefik-consul-registrator-${{ needs.build.outputs.version }}
-          path: /tmp
-      
-      - name: Upload Docker image to release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ needs.build.outputs.version }}
           files: /tmp/traefik-consul-registrator.tar
+      
+
 
   notify:
     needs: [build, release]
