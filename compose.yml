@@ -1,0 +1,23 @@
+---
+services:
+  traefik-consul-registrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Timezone setting
+      TZ: Europe/Paris
+      # Command line options as environment variables
+      CONSUL_API: "$CONSUL_API"
+      SYNC_INTERVAL: "30"
+      INTERNAL: "true"
+      CLEANUP: "true"
+      TAGS: "traefik,service"
+      # Optional settings (commented out by default)
+      # HOST_IP: "" # Auto-detected when blank
+      # NETWORKS_PRIORITY: "bridge,traefik" # Prioritize networks
+      # DEREGISTER: "always" # Options: always, on-success

@@ -1,0 +1,206 @@
+name: Build & Release Traefik Consul Registrator
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (override auto-generated version)'
+        required: false
+        type: string
+      release_notes:
+        description: 'Release notes'
+        required: false
+        type: string
+        default: 'New release of Traefik Consul Registrator'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+      version: ${{ steps.set_version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set version
+        id: set_version
+        run: |
+          # Get current date in YYYY-MM-DD format
+          DATE=$(date +'%Y-%m-%d')
+          
+          # Get short git commit hash
+          GIT_SHORT=$(git rev-parse --short HEAD)
+          
+          # Use provided version or generate one based on date and git commit
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${DATE}-${GIT_SHORT}"
+          fi
+          
+          echo "Generated version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          
+      - name: Generate go.sum
+        run: |
+          # Ensure go.sum is properly generated
+          go mod tidy
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image
+        id: docker_build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          tags: traefik-consul-registrator:${{ steps.set_version.outputs.version }}
+          outputs: type=docker,dest=/tmp/traefik-consul-registrator.tar
+      
+      - name: Upload Docker image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: traefik-consul-registrator-${{ steps.set_version.outputs.version }}
+          path: /tmp/traefik-consul-registrator.tar
+          retention-days: 7
+
+  release:
+    needs: build
+    if: success()
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ job.status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          name: Traefik Consul Registrator v${{ needs.build.outputs.version }}
+          body: |
+            ${{ github.event.inputs.release_notes || format('Auto-generated release from commit {0}', github.sha) }}
+            
+            ### Release Date
+            $(date +'%Y-%m-%d')
+            
+            ### About this release
+            This release contains the Traefik Consul Registrator application that automatically registers 
+            Traefik-exposed Docker containers in Consul with the correct external IP address.
+            
+            #### Features:
+            - Automatically registers services in Consul with the correct external host IP
+            - Uses reliable host IP detection with UDP connection to 8.8.8.8
+            - Adds domain information from Traefik labels as metadata in Consul
+            - Configurable via environment variables
+            
+            ### Docker Image
+            Docker image is available as an artifact in this workflow run.
+          draft: false
+          prerelease: false
+      
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: traefik-consul-registrator-${{ needs.build.outputs.version }}
+          path: /tmp
+      
+      - name: Upload Docker image to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /tmp/traefik-consul-registrator.tar
+          asset_name: traefik-consul-registrator-${{ needs.build.outputs.version }}.tar
+          asset_content_type: application/x-tar
+
+  notify:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Prepare notification message
+        id: notification
+        run: |
+          if [[ "${{ needs.build.outputs.status }}" == "success" && "${{ needs.release.outputs.status }}" == "success" ]]; then
+            echo "STATUS=success" >> $GITHUB_OUTPUT
+            echo "MESSAGE=🎉 Traefik Consul Registrator v${{ needs.build.outputs.version }} successfully built and released!" >> $GITHUB_OUTPUT
+          else
+            echo "STATUS=failure" >> $GITHUB_OUTPUT
+            echo "MESSAGE=❌ Traefik Consul Registrator v${{ needs.build.outputs.version }} build or release failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # Prepare Slack payload
+          STATUS="${{ steps.notification.outputs.STATUS }}"
+          MESSAGE="${{ steps.notification.outputs.MESSAGE }}"
+          COLOR=$([[ "$STATUS" == "success" ]] && echo "good" || echo "danger")
+          
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"attachments\": [
+                {
+                  \"color\": \"$COLOR\",
+                  \"title\": \"Traefik Consul Registrator Release $([[ \"$STATUS\" == \"success\" ]] && echo \"Successful\" || echo \"Failed\")\",
+                  \"title_link\": \"https://github.com/${{ github.repository }}/releases/tag/v${{ needs.build.outputs.version }}\",
+                  \"text\": \"$MESSAGE\",
+                  \"fields\": [
+                    {
+                      \"title\": \"Version\",
+                      \"value\": \"v${{ needs.build.outputs.version }}\",
+                      \"short\": true
+                    },
+                    {
+                      \"title\": \"Author\",
+                      \"value\": \"${{ github.actor }}\",
+                      \"short\": true
+                    }
+                  ]
+                }
+              ]
+            }" \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Discord notification
+        if: env.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          # Prepare Discord payload
+          STATUS="${{ steps.notification.outputs.STATUS }}"
+          MESSAGE="${{ steps.notification.outputs.MESSAGE }}"
+          COLOR=$([[ "$STATUS" == "success" ]] && echo "5025616" || echo "16711680")
+          
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [
+                {
+                  \"title\": \"Traefik Consul Registrator Release $([[ \"$STATUS\" == \"success\" ]] && echo \"Successful\" || echo \"Failed\")\",
+                  \"description\": \"$MESSAGE\\n\\nRelease: v${{ needs.build.outputs.version }}\\nBy: ${{ github.actor }}\",
+                  \"color\": $COLOR,
+                  \"url\": \"https://github.com/${{ github.repository }}/releases/tag/v${{ needs.build.outputs.version }}\"
+                }
+              ]
+            }" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
