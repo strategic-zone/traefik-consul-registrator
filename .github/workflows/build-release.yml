@@ -114,20 +114,18 @@ jobs:
           prerelease: false
       
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: traefik-consul-registrator-${{ needs.build.outputs.version }}
           path: /tmp
       
       - name: Upload Docker image to release
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: /tmp/traefik-consul-registrator.tar
-          asset_name: traefik-consul-registrator-${{ needs.build.outputs.version }}.tar
-          asset_content_type: application/x-tar
+          tag_name: v${{ needs.build.outputs.version }}
+          files: /tmp/traefik-consul-registrator.tar
 
   notify:
     needs: [build, release]
