@@ -25,7 +25,7 @@ Traefik-Consul-Registrator bridges the gap between Traefik and Consul by automat
 docker run -d --name traefik-consul-registrator \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --network=host \
-  traefik-consul-registrator:latest \
+  ghcr.io/strategic-zone/traefik-consul-registrator:latest \
   --consul-api=http://localhost:8500
 ```
 

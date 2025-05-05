@@ -66,7 +66,9 @@ jobs:
         with:
           context: .
           push: false
-          tags: traefik-consul-registrator:${{ steps.set_version.outputs.version }}
+          tags: |
+            traefik-consul-registrator:${{ steps.set_version.outputs.version }}
+            traefik-consul-registrator:latest
           outputs: type=docker,dest=/tmp/traefik-consul-registrator.tar
       
       - name: Upload Docker image as artifact
@@ -111,15 +113,15 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.build.outputs.version }}
-          name: Traefik Consul Registrator Docker Image ${{ needs.build.outputs.version }} Latest
+          name: Traefik Consul Registrator Docker Image Latest
           body: |
-            # Traefik Consul Registrator Docker Image ${{ needs.build.outputs.version }}
+            # Traefik Consul Registrator Docker Image Latest
 
             Date: ${{ steps.release_date.outputs.datetime }}
 
             ## Docker Image Details
 
-            - Image Name: traefik-consul-registrator:${{ needs.build.outputs.version }}
+            - Image Name: traefik-consul-registrator:latest
             - Version: ${{ needs.build.outputs.version }}
             - Commit: ${{ steps.commit_info.outputs.short_sha }}
 
@@ -245,32 +247,21 @@ jobs:
           REPO="${{ github.repository }}"
           BRANCH="${GITHUB_REF##*/}"
           COMMIT_MSG="${{ steps.commit_message.outputs.message }}"
-          SHORT_SHA="${GITHUB_SHA::7}"
           REPO_NAME="${REPO##*/}"
+          COLOR=$([[ "$STATUS" == "success" ]] && echo "5025616" || echo "16711680")
           
-          # Set icon and color based on status
-          if [[ "$STATUS" == "success" ]]; then
-            ICON="🐳"
-            STATUS_TEXT="Built Successfully! 🚀"
-            COLOR="5025616"
-          else
-            ICON="❌"
-            STATUS_TEXT="Build Failed"
-            COLOR="16711680"
-          fi
+          # Create a temporary JSON file for the payload
+          cat > /tmp/discord-payload.json << EOL
+          {
+            "embeds": [{
+              "title": "🐳 Docker Image $([[ "$STATUS" == "success" ]] && echo "Built Successfully! 🚀" || echo "Build Failed")",
+              "description": "Author: $ACTOR\nBranch: $BRANCH\nVersion: $VERSION\nMessage: $COMMIT_MSG\n\n**Docker Image:**\nghcr.io/$REPO:$VERSION\nghcr.io/$REPO:latest\n\n**Pull Command:**\n\`\`\`\ndocker pull ghcr.io/$REPO:latest\n\`\`\`\n\n**GitHub Release:**\nhttps://github.com/$REPO/releases/tag/v$VERSION",
+              "color": $COLOR
+            }]
+          }
+          EOL
           
-          # Create formatted content for Discord
-          DESCRIPTION="**$ICON Docker Image $STATUS_TEXT**\n\nAuthor: $ACTOR\nBranch: $BRANCH\nVersion: $VERSION\nMessage: $COMMIT_MSG\n\nDocker Image:\n$REPO_NAME:$VERSION\n\nPull Command:\ndocker load < $REPO_NAME-$VERSION.tar\n\nGitHub Release:\nhttps://github.com/$REPO/releases/tag/v$VERSION"
-          
-          # Create JSON with jq
-          JSON=$(jq -n \
-            --arg desc "$DESCRIPTION" \
-            --argjson color "$COLOR" \
-            '{"embeds": [{"description": $desc, "color": $color}]}'
-          )
-          
-          # Post to Discord
-          curl -X POST \
+          # Send the notification
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$JSON" \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+            -d @/tmp/discord-payload.json
