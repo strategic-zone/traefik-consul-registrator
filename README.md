@@ -8,7 +8,7 @@ Traefik-Consul-Registrator bridges the gap between Traefik and Consul by automat
 
 ## Features
 
-- Automatic registration of Traefik-exposed Docker containers in Consul
+- Selective registration of Docker containers in Consul using `traefik.consul.expose = true` label
 - Container event monitoring (start, stop, kill)
 - Periodic synchronization to maintain consistency
 - Customizable service tags based on Traefik labels
@@ -59,15 +59,27 @@ Traefik-Consul-Registrator performs the following operations:
 
 1. Connects to both Docker and Consul on startup
 2. Monitors Docker events (container start/stop/kill)
-3. Identifies containers with Traefik labels
+3. Identifies containers with the `traefik.consul.expose = true` label
 4. Extracts service information from Traefik labels
 5. Registers services in Consul with appropriate health checks
-6. Periodically synchronizes all containers with Consul
+6. Periodically synchronizes containers with Consul
 7. Deregisters services when containers stop or are removed
 
 ## Service Registration
 
-For each container exposed through Traefik, the registrator creates a Consul service with:
+### Required Labels
+
+To register a container in Consul, it must have the following label:
+
+```
+traefik.consul.expose=true
+```
+
+Only containers with this label will be registered, regardless of other Traefik labels.
+
+### Service Details
+
+For each qualifying container, the registrator creates a Consul service with:
 
 - ID: `<container-id>-<port>`
 - Name: Derived from service labels or container name
@@ -82,12 +94,25 @@ For each container exposed through Traefik, the registrator creates a Consul ser
 ```bash
 docker run -d --name my-service \
   -l "traefik.enable=true" \
+  -l "traefik.consul.expose=true" \
   -l "traefik.http.routers.my-service.rule=Host(\`my-service.example.com\`)" \
   -l "traefik.http.services.my-service.loadbalancer.server.port=80" \
   my-image:latest
 ```
 
 This will be registered in Consul as service `my-service` with tags including `domain:my-service.example.com`.
+
+### Container Not Registered in Consul
+
+```bash
+docker run -d --name my-other-service \
+  -l "traefik.enable=true" \
+  -l "traefik.http.routers.my-other-service.rule=Host(\`other.example.com\`)" \
+  -l "traefik.http.services.my-other-service.loadbalancer.server.port=80" \
+  my-image:latest
+```
+
+This container will be handled by Traefik but NOT registered in Consul because it lacks the `traefik.consul.expose=true` label.
 
 ## License
 

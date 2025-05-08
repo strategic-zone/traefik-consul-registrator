@@ -12,12 +12,12 @@ services:
       # Timezone setting
       TZ: Europe/Paris
       # Command line options as environment variables
-      TCR_CONSUL_API: "$TCR_CONSUL_API"
+      TCR_CONSUL_API: ${TCR_CONSUL_API}
       TCR_SYNC_INTERVAL: "30"
-      TCR_INTERNAL: "true"
+      TCR_INTERNAL: "false"
       TCR_CLEANUP: "true"
       TCR_TAGS: "traefik,service"
-      # Optional settings (commented out by default)
-      # HOST_IP: "" # Auto-detected when blank
-      # NETWORKS_PRIORITY: "bridge,traefik" # Prioritize networks
-      # DEREGISTER: "always" # Options: always, on-success
+      # other options
+      # TCR_DEREGISTER: "always"
+      # TCR_NETWORKS_PRIORITY: "bridge,traefik"
+      # TCR_HOST_IP: ""

@@ -700,12 +700,12 @@ func (r *TraefikRegistrator) isInSubnet(ipStr, subnetStr string) bool {
 	return subnet.Contains(ip)
 }
 
-// hasTraefikLabels checks if a container has any Traefik-related labels
+// hasTraefikLabels checks if a container has the required Traefik Consul expose label
 func (r *TraefikRegistrator) hasTraefikLabels(labels map[string]string) bool {
-	for key := range labels {
-		if strings.Contains(strings.ToLower(key), "traefik") {
-			return true
-		}
+	// Check specifically for the traefik.consul.expose = true label
+	value, exists := labels["traefik.consul.expose"]
+	if exists && strings.ToLower(value) == "true" {
+		return true
 	}
 	return false
 }
