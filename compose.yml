@@ -1,9 +1,32 @@
 ---
 services:
+  consul-agent:
+    image: hashicorp/consul:latest
+    container_name: consul-agent
+    hostname: ${CONSUL_HOSTNAME}
+    restart: always
+    network_mode: host
+    env_file: ./.env
+    labels:
+      # auto update
+      - com.centurylinklabs.watchtower.enable=true
+    command:
+      - agent
+      - -retry-join=${CONSUL_CLUSTER_SERVER}
+      - -client=0.0.0.0
+      - -node=${CONSUL_HOSTNAME}
+      - -datacenter=${CONSUL_DATACENTER}
+      - -data-dir=/consul/data
+      - -bind={{ GetInterfaceIP "eth0" }}
+      - -advertise={{ GetInterfaceIP "eth0" }}
+    volumes:
+      - ./consul/data:/consul/data
+      - ./consul/config:/consul/config
   traefik-consul-registrator:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/strategic-zone/traefik-consul-registrator:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -12,7 +35,7 @@ services:
       # Timezone setting
       TZ: Europe/Paris
       # Command line options as environment variables
-      TCR_CONSUL_API: ${TCR_CONSUL_API}
+      TCR_CONSUL_API: http://localhost:8500
       TCR_SYNC_INTERVAL: "30"
       TCR_INTERNAL: "false"
       TCR_CLEANUP: "true"
