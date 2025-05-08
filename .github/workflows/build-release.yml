@@ -19,6 +19,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     outputs:
       status: ${{ job.status }}
       version: ${{ steps.set_version.outputs.version }}
@@ -59,24 +62,23 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build Docker image
+      - name: Build and push Docker image
         id: docker_build
         uses: docker/build-push-action@v4
         with:
           context: .
-          push: false
+          push: true
           tags: |
-            traefik-consul-registrator:${{ steps.set_version.outputs.version }}
-            traefik-consul-registrator:latest
-          outputs: type=docker,dest=/tmp/traefik-consul-registrator.tar
-      
-      - name: Upload Docker image as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: traefik-consul-registrator-${{ steps.set_version.outputs.version }}
-          path: /tmp/traefik-consul-registrator.tar
-          retention-days: 7
+            ghcr.io/${{ github.repository_owner }}/traefik-consul-registrator:${{ steps.set_version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/traefik-consul-registrator:latest
 
   release:
     needs: build
@@ -84,17 +86,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: read
     outputs:
       status: ${{ job.status }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      
-      - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: traefik-consul-registrator-${{ needs.build.outputs.version }}
-          path: /tmp
 
       - name: Set Release Date and Time
         id: release_date
@@ -138,16 +135,12 @@ jobs:
 
             ## How to Use
 
-            ### Download the Docker image:
+            ### Pull the Docker image:
             ```bash
-            # Download the Docker image:
-            wget https://github.com/${{ github.repository }}/releases/download/v${{ needs.build.outputs.version }}/traefik-consul-registrator-${{ needs.build.outputs.version }}.tar
-            ```
-
-            ### Load the Docker image:
-            ```bash
-            # Load the image into Docker:
-            docker load < traefik-consul-registrator-${{ needs.build.outputs.version }}.tar
+            # Pull the image from GitHub Container Registry:
+            docker pull ghcr.io/${{ github.repository_owner }}/traefik-consul-registrator:latest
+            # Or use a specific version:
+            docker pull ghcr.io/${{ github.repository_owner }}/traefik-consul-registrator:${{ needs.build.outputs.version }}
             ```
 
             ### Run the container with Docker:
@@ -155,7 +148,7 @@ jobs:
             docker run -d --name traefik-consul-registrator \
               -v /var/run/docker.sock:/var/run/docker.sock \
               --network=host \
-              traefik-consul-registrator:${{ needs.build.outputs.version }} \
+              ghcr.io/${{ github.repository_owner }}/traefik-consul-registrator:${{ needs.build.outputs.version }} \
               --consul-api=http://localhost:8500
             ```
 
@@ -165,7 +158,6 @@ jobs:
             For more options and configurations, please refer to the [documentation](https://github.com/${{ github.repository }}).
           draft: false
           prerelease: false
-          files: /tmp/traefik-consul-registrator.tar
       
 
 
@@ -185,35 +177,40 @@ jobs:
             echo "MESSAGE=❌ Traefik Consul Registrator v${{ needs.build.outputs.version }} build or release failed" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send Slack notification
-        if: env.SLACK_WEBHOOK_URL != ''
+      - name: Send Discord notification
+        if: env.DISCORD_WEBHOOK_URL != ''
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          # Prepare Slack payload
+          # Prepare Discord payload
           STATUS="${{ steps.notification.outputs.STATUS }}"
           MESSAGE="${{ steps.notification.outputs.MESSAGE }}"
-          COLOR=$([[ "$STATUS" == "success" ]] && echo "good" || echo "danger")
+          # Discord uses decimal color codes, converting common colors
+          COLOR=$([[ "$STATUS" == "success" ]] && echo "65280" || echo "16711680") # Green or Red
           
+          # Create release URL
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/v${{ needs.build.outputs.version }}"
+          
+          # Discord webhook payload
           curl -X POST \
             -H "Content-Type: application/json" \
             -d "{
-              \"attachments\": [
+              \"embeds\": [
                 {
-                  \"color\": \"$COLOR\",
                   \"title\": \"Traefik Consul Registrator Release $([[ \"$STATUS\" == \"success\" ]] && echo \"Successful\" || echo \"Failed\")\",
-                  \"title_link\": \"https://github.com/${{ github.repository }}/releases/tag/v${{ needs.build.outputs.version }}\",
-                  \"text\": \"$MESSAGE\",
+                  \"description\": \"$MESSAGE\",
+                  \"color\": $COLOR,
+                  \"url\": \"$RELEASE_URL\",
                   \"fields\": [
                     {
-                      \"title\": \"Version\",
+                      \"name\": \"Version\",
                       \"value\": \"v${{ needs.build.outputs.version }}\",
-                      \"short\": true
+                      \"inline\": true
                     },
                     {
-                      \"title\": \"Author\",
+                      \"name\": \"Author\",
                       \"value\": \"${{ github.actor }}\",
-                      \"short\": true
+                      \"inline\": true
                     }
                   ]
                 }
